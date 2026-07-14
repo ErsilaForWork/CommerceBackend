@@ -1,0 +1,58 @@
+spring.application.name=simulator-api-gateway
+server.port=8080
+
+# Переключено на имя Docker-контейнера Redis
+spring.data.redis.host=redis-cache
+spring.data.redis.password=${REDIS_PASS}
+spring.data.redis.port=6379
+
+spring.cloud.gateway.server.webflux.httpclient.connect-timeout=5000
+spring.cloud.gateway.server.webflux.httpclient.response-timeout=10s
+
+spring.cloud.gateway.server.webflux.globalcors.cors-configurations.[/**].allowedOrigins=http://localhost:8000,https://lms-academy.kase.kz,null
+spring.cloud.gateway.server.webflux.globalcors.cors-configurations.[/**].allowedMethods=GET,POST,PUT,DELETE,OPTIONS
+spring.cloud.gateway.server.webflux.globalcors.cors-configurations.[/**].allowedHeaders=*
+spring.cloud.gateway.server.webflux.globalcors.cors-configurations.[/**].allowCredentials=true
+
+spring.cloud.gateway.server.webflux.default-filters[0]=AddResponseHeader=X-Content-Type-Options, nosniff
+spring.cloud.gateway.server.webflux.default-filters[1]=AddResponseHeader=X-Frame-Options, DENY
+spring.cloud.gateway.server.webflux.default-filters[2]=AddResponseHeader=X-XSS-Protection, 1; mode=block
+spring.cloud.gateway.server.webflux.default-filters[3]=RemoveResponseHeader=Server
+spring.cloud.gateway.server.webflux.default-filters[4]=DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials, RETAIN_FIRST
+
+# --- МАРШРУТЫ ИЗМЕНЕНЫ НА ВНУТРЕННИЕ ИМЕНА КОНТЕЙНЕРОВ С ПОРТОМ 8080 ---
+spring.cloud.gateway.server.webflux.routes[0].id=auth-service
+spring.cloud.gateway.server.webflux.routes[0].uri=http://auth-service:8080
+
+spring.cloud.gateway.server.webflux.routes[0].predicates[0]=Path=/api/v1/auth/**,/api/v1/users/**,/webhooks/user-updated
+
+spring.cloud.gateway.server.webflux.routes[0].filters[0].name=RequestRateLimiter
+spring.cloud.gateway.server.webflux.routes[0].filters[0].args.redis-rate-limiter.replenishRate=10
+spring.cloud.gateway.server.webflux.routes[0].filters[0].args.redis-rate-limiter.burstCapacity=20
+spring.cloud.gateway.server.webflux.routes[0].filters[0].args.redis-rate-limiter.requestedTokens=1
+
+spring.cloud.gateway.server.webflux.routes[0].filters[1].name=Retry
+spring.cloud.gateway.server.webflux.routes[0].filters[1].args.retries=3
+spring.cloud.gateway.server.webflux.routes[0].filters[1].args.statuses=BAD_GATEWAY,SERVICE_UNAVAILABLE,GATEWAY_TIMEOUT
+spring.cloud.gateway.server.webflux.routes[0].filters[1].args.methods=GET,POST
+spring.cloud.gateway.server.webflux.routes[0].filters[1].args.backoff.firstBackoff=100ms
+spring.cloud.gateway.server.webflux.routes[0].filters[1].args.backoff.maxBackoff=1s
+spring.cloud.gateway.server.webflux.routes[0].filters[1].args.backoff.factor=2
+
+spring.cloud.gateway.server.webflux.routes[1].id=chart-service
+spring.cloud.gateway.server.webflux.routes[1].uri=http://chart-service:8080
+
+spring.cloud.gateway.server.webflux.routes[1].predicates[0]=Path=/api/v1/charts/**
+
+spring.cloud.gateway.server.webflux.routes[1].filters[0].name=RequestRateLimiter
+spring.cloud.gateway.server.webflux.routes[1].filters[0].args.redis-rate-limiter.replenishRate=10
+spring.cloud.gateway.server.webflux.routes[1].filters[0].args.redis-rate-limiter.burstCapacity=20
+spring.cloud.gateway.server.webflux.routes[1].filters[0].args.redis-rate-limiter.requestedTokens=1
+
+management.endpoints.web.exposure.include=health,info,prometheus
+management.endpoint.health.show-details=always
+management.endpoint.health.probes.enabled=true
+management.health.livenessState.enabled=true
+management.health.readinessState.enabled=true
+
+gateway.security.jwt-secret=${APP_JWT_SECRET}
